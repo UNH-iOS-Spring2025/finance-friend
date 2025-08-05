@@ -12,9 +12,11 @@ struct IncomeItem: Identifiable {
     var source: String
     var amount: Double
     var dateString: String
-    var recurrence: String = "One-Time"
+    var recurrence: String
 
     var dateFormatted: String {
-        return dateString
+        dateString
     }
 }
+
+

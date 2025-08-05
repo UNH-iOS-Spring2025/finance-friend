@@ -8,8 +8,10 @@ struct AddExpenseView: View {
     @State private var amount: String = ""
     @State private var isLoan: Bool = false
     @State private var selectedDate = Date()
-    @State private var showSuccess = false
+
     @State private var showError = false
+    @State private var showConfirmation = false
+    @State private var showSuccess = false
 
     let expenseCategories = ["Rent", "Groceries", "Utilities", "Subscriptions", "Entertainment", "Loan", "Misc"]
 
@@ -40,23 +42,15 @@ struct AddExpenseView: View {
 
                 Section {
                     Button(action: {
-                        guard let amt = Double(amount), !category.isEmpty else {
+                        guard let _ = Double(amount), !category.isEmpty else {
                             showError = true
                             return
                         }
-
-                        manager.addExpense(
-                            category: category,
-                            amount: amt,
-                            isLoan: isLoan,
-                            date: selectedDate
-                        )
-                        showSuccess = true
-                        presentationMode.wrappedValue.dismiss()
+                        showConfirmation = true
                     }) {
                         Text("Add Expense")
                             .foregroundColor(.white)
-                            .frame(maxWidth: .infinity, alignment: .center)
+                            .frame(maxWidth: .infinity)
                             .padding()
                             .background(Color.red)
                             .cornerRadius(8)
@@ -65,10 +59,31 @@ struct AddExpenseView: View {
             }
             .navigationTitle("Add Expense")
             .navigationBarTitleDisplayMode(.inline)
-            .alert("Success", isPresented: $showSuccess) {
+
+            // MARK: - Alerts
+            .alert("Please fill all fields correctly", isPresented: $showError) {
                 Button("OK", role: .cancel) {}
             }
-            .alert("Please fill all fields correctly", isPresented: $showError) {
+
+            .alert("Confirm Expense", isPresented: $showConfirmation) {
+                Button("Cancel", role: .cancel) {}
+                Button("Confirm", role: .none) {
+                    if let amt = Double(amount) {
+                        manager.addExpense(
+                            category: category,
+                            amount: amt,
+                            isLoan: isLoan,
+                            date: selectedDate
+                        )
+                        showSuccess = true
+                        presentationMode.wrappedValue.dismiss()
+                    }
+                }
+            } message: {
+                Text("Are you sure you want to add this expense?")
+            }
+
+            .alert("Success", isPresented: $showSuccess) {
                 Button("OK", role: .cancel) {}
             }
         }

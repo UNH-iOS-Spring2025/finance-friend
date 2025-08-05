@@ -12,10 +12,11 @@ struct ExpenseItem: Identifiable {
     var category: String
     var amount: Double
     var dateString: String
-    var isLoan: Bool = false
+    var isLoan: Bool
 
     var dateFormatted: String {
-        return dateString
+        dateString
     }
 }
+
 

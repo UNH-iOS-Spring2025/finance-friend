@@ -1,44 +1,91 @@
 import SwiftUI
 
 struct AddIncomeView: View {
-    @Environment(\.presentationMode) var presentationMode
-    @State private var source = ""
-    @State private var amount = ""
-    @State private var date = Date()
-    @State private var recurrence = "One-Time"
-
     @ObservedObject var manager: FirestoreManager
+    @Environment(\.presentationMode) var presentationMode
 
-    let recurrenceOptions = ["One-Time", "Daily", "Weekly", "Monthly", "Yearly"]
+    @State private var source: String = ""
+    @State private var amount: String = ""
+    @State private var recurrence: String = "One-Time"
+    @State private var selectedDate = Date()
+
+    @State private var showConfirmation = false
+    @State private var showSuccess = false
+    @State private var showError = false
+
+    let recurrenceOptions = ["One-Time", "Weekly", "Monthly", "Annually"]
 
     var body: some View {
         NavigationView {
             Form {
-                Section(header: Text("Income Details")) {
-                    TextField("Source", text: $source)
-                    TextField("Amount", text: $amount)
-                        .keyboardType(.decimalPad)
+                Section(header: Text("Source")) {
+                    TextField("Income source", text: $source)
+                }
 
+                Section(header: Text("Amount")) {
+                    TextField("Enter amount", text: $amount)
+                        .keyboardType(.decimalPad)
+                }
+
+                Section(header: Text("Recurrence")) {
                     Picker("Recurrence", selection: $recurrence) {
-                        ForEach(recurrenceOptions, id: \.self) {
-                            Text($0)
+                        ForEach(recurrenceOptions, id: \.self) { option in
+                            Text(option).tag(option)
                         }
                     }
-
-                    DatePicker("Date", selection: $date, displayedComponents: .date)
+                    .pickerStyle(SegmentedPickerStyle())
                 }
 
-                Button("Save") {
-                    guard let amt = Double(amount) else { return }
-                    manager.addIncome(source: source, amount: amt, recurrence: recurrence, date: date)
-                    presentationMode.wrappedValue.dismiss()
+                Section(header: Text("Date")) {
+                    DatePicker("Date", selection: $selectedDate, displayedComponents: .date)
                 }
-                .foregroundColor(.blue)
+
+                Section {
+                    Button(action: {
+                        guard let _ = Double(amount), !source.isEmpty else {
+                            showError = true
+                            return
+                        }
+                        showConfirmation = true
+                    }) {
+                        Text("Add Income")
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.green)
+                            .cornerRadius(8)
+                    }
+                }
             }
             .navigationTitle("Add Income")
-            .navigationBarItems(trailing: Button("Cancel") {
-                presentationMode.wrappedValue.dismiss()
-            })
+            .navigationBarTitleDisplayMode(.inline)
+
+            // MARK: Alerts
+            .alert("Please fill all fields correctly", isPresented: $showError) {
+                Button("OK", role: .cancel) {}
+            }
+
+            .alert("Confirm Income", isPresented: $showConfirmation) {
+                Button("Cancel", role: .cancel) {}
+                Button("Confirm", role: .none) {
+                    if let amt = Double(amount) {
+                        manager.addIncome(
+                            source: source,
+                            amount: amt,
+                            recurrence: recurrence,
+                            date: selectedDate
+                        )
+                        showSuccess = true
+                        presentationMode.wrappedValue.dismiss()
+                    }
+                }
+            } message: {
+                Text("Are you sure you want to add this income?")
+            }
+
+            .alert("Success", isPresented: $showSuccess) {
+                Button("OK", role: .cancel) {}
+            }
         }
     }
 }
