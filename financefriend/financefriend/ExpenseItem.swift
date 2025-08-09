@@ -7,16 +7,15 @@
 
 import Foundation
 
-struct ExpenseItem: Identifiable {
+struct ExpenseItem: Identifiable, Equatable {
     var id = UUID()
     var category: String
     var amount: Double
     var dateString: String
     var isLoan: Bool
 
-    var dateFormatted: String {
-        dateString
-    }
+    var dateFormatted: String { dateString }
 }
+
 
 

@@ -8,69 +8,67 @@ struct TrackerView: View {
     var body: some View {
         NavigationView {
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(spacing: 24) {
+                    Text("Tracker")
+                        .font(.largeTitle.bold())
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal)
+                        .padding(.top)
 
-                    // Incomes Section
-                    Group {
-                        Text("Incomes")
-                            .font(.headline)
-                            .padding(.horizontal)
-
+                    GroupBox(label: Text("Incomes").font(.headline)) {
                         if manager.incomes.isEmpty {
                             Text("No incomes added.")
                                 .foregroundColor(.gray)
-                                .padding(.horizontal)
                         } else {
-                            ForEach(manager.incomes) { income in
-                                HStack {
-                                    VStack(alignment: .leading) {
-                                        Text(income.source)
-                                            .font(.headline)
-                                        Text("\(income.recurrence) • \(income.dateFormatted)")
-                                            .font(.caption)
-                                            .foregroundColor(.gray)
+                            VStack(alignment: .leading, spacing: 12) {
+                                ForEach(manager.incomes) { income in
+                                    HStack {
+                                        VStack(alignment: .leading) {
+                                            Text(income.source)
+                                                .font(.headline)
+                                            Text("\(income.recurrence) • \(income.dateFormatted)")
+                                                .font(.caption)
+                                                .foregroundColor(.gray)
+                                        }
+                                        Spacer()
+                                        Text("$\(income.amount, specifier: "%.2f")")
+                                            .font(.subheadline)
+                                            .foregroundColor(.green)
                                     }
-                                    Spacer()
-                                    Text("$\(income.amount, specifier: "%.2f")")
-                                        .font(.subheadline)
+                                    Divider()
                                 }
-                                .padding(.horizontal)
                             }
                         }
                     }
+                    .padding(.horizontal)
 
-                    Divider().padding(.vertical, 8)
-
-                    // Expenses Section
-                    Group {
-                        Text("Expenses")
-                            .font(.headline)
-                            .padding(.horizontal)
-
+                    GroupBox(label: Text("Expenses").font(.headline)) {
                         if manager.expenses.isEmpty {
                             Text("No expenses added.")
                                 .foregroundColor(.gray)
-                                .padding(.horizontal)
                         } else {
-                            ForEach(manager.expenses) { expense in
-                                HStack {
-                                    VStack(alignment: .leading) {
-                                        Text(expense.category)
-                                            .font(.headline)
-                                        Text(expense.dateFormatted)
-                                            .font(.caption)
-                                            .foregroundColor(.gray)
+                            VStack(alignment: .leading, spacing: 12) {
+                                ForEach(manager.expenses) { expense in
+                                    HStack {
+                                        VStack(alignment: .leading) {
+                                            Text(expense.category)
+                                                .font(.headline)
+                                            Text(expense.dateFormatted)
+                                                .font(.caption)
+                                                .foregroundColor(.gray)
+                                        }
+                                        Spacer()
+                                        Text("$\(expense.amount, specifier: "%.2f")")
+                                            .font(.subheadline)
+                                            .foregroundColor(expense.isLoan ? .red : .primary)
                                     }
-                                    Spacer()
-                                    Text("$\(expense.amount, specifier: "%.2f")")
-                                        .font(.subheadline)
+                                    Divider()
                                 }
-                                .padding(.horizontal)
                             }
                         }
                     }
+                    .padding(.horizontal)
 
-                    // Buttons
                     HStack(spacing: 16) {
                         Button(action: { showAddIncome = true }) {
                             Text("Add Income")
@@ -94,9 +92,9 @@ struct TrackerView: View {
                     }
                     .padding(.horizontal)
                 }
-                .padding(.top)
+                .padding(.bottom)
             }
-            .navigationTitle("Tracker")
+            .background(Color(.systemGroupedBackground))
             .sheet(isPresented: $showAddExpense) {
                 AddExpenseView(manager: manager)
             }

@@ -7,16 +7,14 @@
 
 import Foundation
 
-struct IncomeItem: Identifiable {
+struct IncomeItem: Identifiable, Equatable {
     var id = UUID()
     var source: String
     var amount: Double
     var dateString: String
     var recurrence: String
 
-    var dateFormatted: String {
-        dateString
-    }
+    var dateFormatted: String { dateString }
 }
 
 
