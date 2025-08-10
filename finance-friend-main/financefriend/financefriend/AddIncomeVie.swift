@@ -4,7 +4,8 @@ struct AddIncomeView: View {
     @ObservedObject var manager: FirestoreManager
     @Environment(\.presentationMode) var presentationMode
 
-    @State private var source: String = ""
+    @State private var selectedCategory: String = "Salary"
+    @State private var customSource: String = ""
     @State private var amount: String = ""
     @State private var recurrence: String = "One-Time"
     @State private var selectedDate = Date()
@@ -13,20 +14,38 @@ struct AddIncomeView: View {
     @State private var showSuccess = false
     @State private var showError = false
 
-    let recurrenceOptions = ["One-Time", "Weekly", "Monthly", "Annually"]
+    // Edit these to taste
+    private let incomeCategories = [
+        "Salary", "Freelance", "Business", "Investment",
+        "Gift", "Allowance", "Bonus", "Other"
+    ]
+
+    private let recurrenceOptions = ["One-Time", "Weekly", "Monthly", "Annually"]
 
     var body: some View {
         NavigationView {
             Form {
+                // Source (dropdown)
                 Section(header: Text("Source")) {
-                    TextField("Income source", text: $source)
+                    Picker("Select Source", selection: $selectedCategory) {
+                        ForEach(incomeCategories, id: \.self) { s in
+                            Text(s).tag(s)
+                        }
+                    }
+                    .pickerStyle(MenuPickerStyle())
+
+                    if selectedCategory == "Other" {
+                        TextField("Custom source", text: $customSource)
+                    }
                 }
 
+                // Amount
                 Section(header: Text("Amount")) {
                     TextField("Enter amount", text: $amount)
                         .keyboardType(.decimalPad)
                 }
 
+                // Recurrence
                 Section(header: Text("Recurrence")) {
                     Picker("Recurrence", selection: $recurrence) {
                         ForEach(recurrenceOptions, id: \.self) { option in
@@ -36,18 +55,20 @@ struct AddIncomeView: View {
                     .pickerStyle(SegmentedPickerStyle())
                 }
 
+                // Date
                 Section(header: Text("Date")) {
                     DatePicker("Date", selection: $selectedDate, displayedComponents: .date)
                 }
 
+                // Save
                 Section {
-                    Button(action: {
-                        guard let _ = Double(amount), !source.isEmpty else {
-                            showError = true
-                            return
+                    Button {
+                        guard let _ = Double(amount) else { showError = true; return }
+                        if selectedCategory == "Other", customSource.trimmingCharacters(in: .whitespaces).isEmpty {
+                            showError = true; return
                         }
                         showConfirmation = true
-                    }) {
+                    } label: {
                         Text("Add Income")
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
@@ -60,17 +81,21 @@ struct AddIncomeView: View {
             .navigationTitle("Add Income")
             .navigationBarTitleDisplayMode(.inline)
 
-            // MARK: Alerts
+            // Alerts
             .alert("Please fill all fields correctly", isPresented: $showError) {
                 Button("OK", role: .cancel) {}
             }
 
             .alert("Confirm Income", isPresented: $showConfirmation) {
                 Button("Cancel", role: .cancel) {}
-                Button("Confirm", role: .none) {
+                Button("Confirm") {
                     if let amt = Double(amount) {
+                        let finalSource = selectedCategory == "Other"
+                            ? customSource.trimmingCharacters(in: .whitespaces)
+                            : selectedCategory
+
                         manager.addIncome(
-                            source: source,
+                            source: finalSource,
                             amount: amt,
                             recurrence: recurrence,
                             date: selectedDate
@@ -80,7 +105,7 @@ struct AddIncomeView: View {
                     }
                 }
             } message: {
-                Text("Are you sure you want to add this income?")
+                Text("Add this income to your tracker?")
             }
 
             .alert("Success", isPresented: $showSuccess) {
