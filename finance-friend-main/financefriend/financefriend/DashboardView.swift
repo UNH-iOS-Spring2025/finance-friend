@@ -13,6 +13,11 @@ struct DashboardView: View {
                         expenseTotal: totalExpense()
                     )
 
+                    BudgetProgressCard(
+                        goals: manager.goals,
+                        expenses: manager.expenses
+                    )
+
                     ExpensesByCategoryCard(
                         data: expensesByCategory()
                     )
@@ -35,14 +40,16 @@ struct DashboardView: View {
                 .padding(.vertical)
             }
             .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
+            .navigationTitle("Dashboard")
             .onAppear {
                 manager.fetchAllExpenses()
                 manager.fetchAllIncomes()
+                manager.fetchGoals()
             }
         }
     }
 
-    // MARK: - Local models for charts
+    // MARK: - Local simple models for charts
     struct CategoryAmount: Identifiable, Equatable {
         let id = UUID()
         let category: String
@@ -84,21 +91,21 @@ struct DashboardView: View {
     }
 }
 
-// MARK: - Header + Blue Bar Card (iOS-16 slim, centered bars)
+// MARK: - Header + Blue Bar Card (slim, centered bars on iOS16)
 private struct HeaderAndBarCard: View {
     let incomeTotal: Double
     let expenseTotal: Double
 
     private let expenseColor = Color(red: 0.95, green: 0.35, blue: 0.30)
 
-    // shorter to fit iPhone 16 Pro nicely
+    // Compact height to look good on modern devices
     private var cardHeight: CGFloat {
         max(260, UIScreen.main.bounds.height * 0.33)
     }
 
     var body: some View {
         VStack(spacing: 18) {
-            // Top row
+            // Title row
             HStack {
                 Image(systemName: "gearshape.fill")
                     .resizable().scaledToFill().frame(width: 20, height: 20)
@@ -115,8 +122,7 @@ private struct HeaderAndBarCard: View {
             // Subheader + legend
             HStack {
                 HStack(spacing: 8) {
-                    Text("Monthly")
-                        .font(.title.bold())
+                    Text("Monthly").font(.title.bold())
                     Image(systemName: "chevron.down")
                         .resizable().scaledToFill().frame(width: 8, height: 8)
                         .fontWeight(.bold).padding(.top, 4)
@@ -136,7 +142,7 @@ private struct HeaderAndBarCard: View {
             }
             .padding(.horizontal)
 
-            // Custom symmetric domain with spacers to keep bars centered and thinner
+            // Symmetric domain to center two slim bars
             let domain = ["spL1","spL2","Income","spM1","spM2","Expense","spR1","spR2"]
             let bars: [(label: String, value: Double, visible: Bool, color: Color)] = [
                 ("spL1", 0, false, .clear),
@@ -160,7 +166,7 @@ private struct HeaderAndBarCard: View {
                     .opacity(item.visible ? 1 : 0) // hide spacers
                 }
             }
-            .chartXScale(domain: domain) // ⬅️ enforce symmetric positions
+            .chartXScale(domain: domain)
             .chartXAxis {
                 AxisMarks(position: .bottom) { value in
                     if let s = value.as(String.self), s == "Income" || s == "Expense" {
@@ -223,7 +229,104 @@ private struct YTRoundedBar: Shape {
     }
 }
 
-// MARK: - Donut + Legend (compact)
+// MARK: - Budget Progress Card
+private struct BudgetProgressCard: View {
+    let goals: [GoalItem]
+    let expenses: [ExpenseItem]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Budget Progress").font(.headline)
+                .foregroundColor(.black).padding(.horizontal)
+
+            if goals.isEmpty {
+                Text("No goals set. Add goals in Account → Budget Goals.")
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal)
+                    .padding(.bottom, 8)
+            } else {
+                VStack(spacing: 10) {
+                    ForEach(goals) { goal in
+                        BudgetRow(goal: goal, spent: totalSpent(for: goal.category))
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.bottom, 6)
+            }
+        }
+        .padding(.vertical, 12)
+        .background(.white)
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 4)
+        .padding(.horizontal, 14)
+    }
+
+    private func totalSpent(for category: String) -> Double {
+        expenses.filter { $0.category == category }
+            .reduce(0) { $0 + $1.amount }
+    }
+}
+
+private struct BudgetRow: View {
+    let goal: GoalItem
+    let spent: Double
+
+    private var percent: Double {
+        guard goal.limit > 0 else { return 0 }
+        let p = spent / goal.limit
+        return min(max(p, 0), 2) // clamp 0...200%
+    }
+
+    private var barColor: Color {
+        if goal.goalType == "under" {
+            switch percent {
+            case ..<1.0: return .green
+            case 1.0..<1.2: return .yellow
+            default: return .red
+            }
+        } else {
+            return spent >= goal.limit ? .green : .red
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(goal.category).font(.subheadline).fontWeight(.semibold)
+                Spacer()
+                Text(goal.goalType == "over" ? "Target ≥ \(goal.limit, specifier: "%.2f")"
+                                             : "Limit ≤ \(goal.limit, specifier: "%.2f")")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.secondary.opacity(0.15))
+                        .frame(height: 10)
+
+                    let width = min(max(percent, 0), 1.0) * geo.size.width
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(barColor)
+                        .frame(width: width, height: 10)
+                        .animation(.easeInOut(duration: 0.4), value: width)
+                }
+            }
+            .frame(height: 10)
+
+            HStack {
+                Text("Spent: $\(spent, specifier: "%.2f")")
+                Spacer()
+                Text("Limit: $\(goal.limit, specifier: "%.2f")")
+            }
+            .font(.caption)
+            .foregroundColor(.secondary)
+        }
+    }
+}
+
+// MARK: - Expenses by Category (Donut + Legend)
 private struct ExpensesByCategoryCard: View {
     let data: [DashboardView.CategoryAmount]
 
@@ -287,7 +390,7 @@ private struct ExpensesByCategoryCard: View {
     }
 }
 
-// MARK: - Trend (expense color updated)
+// MARK: - Trend (Income vs Expense)
 private struct TrendCard: View {
     let incomeData: [DashboardView.DateAmount]
     let expenseData: [DashboardView.DateAmount]
