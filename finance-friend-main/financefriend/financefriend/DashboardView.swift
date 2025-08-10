@@ -7,7 +7,7 @@ struct DashboardView: View {
     var body: some View {
         NavigationView {
             ScrollView {
-                VStack(spacing: 24) {
+                VStack(spacing: 20) {
                     HeaderAndBarCard(
                         incomeTotal: totalIncome(),
                         expenseTotal: totalExpense()
@@ -32,7 +32,7 @@ struct DashboardView: View {
                         expense: totalExpense()
                     )
                 }
-                .padding(.vertical)
+                .padding(.vertical, 12)
             }
             .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
             .onAppear {
@@ -84,17 +84,18 @@ struct DashboardView: View {
     }
 }
 
-// MARK: - Header + Blue Bar Card (YouTube-like)
+// MARK: - Header + Blue Bar Card (resized for 16 Pro)
 private struct HeaderAndBarCard: View {
     let incomeTotal: Double
     let expenseTotal: Double
 
+    // Smaller than before: ~33% of screen height (was ~42%)
     private var cardHeight: CGFloat {
-        UIScreen.main.bounds.height * 0.42
+        max(260, UIScreen.main.bounds.height * 0.33)
     }
 
     var body: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: 18) {
             // Top row: gear + title
             HStack {
                 Image(systemName: "gearshape.fill")
@@ -102,34 +103,34 @@ private struct HeaderAndBarCard: View {
                 Spacer()
                 Text("Spending")
                     .font(.headline.weight(.semibold))
-                    .padding(.trailing, 20)
+                    .padding(.trailing, 16)
                 Spacer()
             }
             .foregroundStyle(.white)
-            .padding(.top, 16)
+            .padding(.top, 10)
             .padding(.horizontal)
 
             // Subheader + legend
             HStack {
-                HStack(spacing: 10) {
+                HStack(spacing: 8) {
                     Text("Monthly")
                         .font(.title.bold())
                     Image(systemName: "chevron.down")
                         .resizable().scaledToFill().frame(width: 8, height: 8)
-                        .fontWeight(.bold).padding(.top, 6)
+                        .fontWeight(.bold).padding(.top, 4)
                 }
                 .foregroundStyle(.white)
 
                 Spacer()
 
-                HStack(spacing: 14) {
+                HStack(spacing: 12) {
                     LegendDot(title: "Earned", color: Color.white.opacity(0.9))
                     LegendDot(title: "Spent",  color: Color.white.opacity(0.6))
                 }
                 .padding(.vertical, 6)
-                .padding(.horizontal, 18)
+                .padding(.horizontal, 14)
                 .background(.black.opacity(0.22))
-                .clipShape(RoundedRectangle(cornerRadius: 20))
+                .clipShape(RoundedRectangle(cornerRadius: 18))
             }
             .padding(.horizontal)
 
@@ -163,18 +164,18 @@ private struct HeaderAndBarCard: View {
                     }
                 }
             }
-            .frame(height: 180)
-            .padding(.horizontal)
+            .frame(height: 150) // was 180
+            .padding(.horizontal, 10)
             .animation(.easeOut(duration: 0.6), value: incomeTotal)
             .animation(.easeOut(duration: 0.6), value: expenseTotal)
 
             Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity)   // fix: no 'height:' label here
-        .frame(height: cardHeight)    // height set in a separate frame
+        .frame(maxWidth: .infinity)
+        .frame(height: cardHeight)
         .background(Color(UIColor.systemBlue))
         .clipShape(RoundedRectangle(cornerRadius: 16))
-        .padding(.horizontal)
+        .padding(.horizontal, 14)
         .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 4)
     }
 }
@@ -202,11 +203,10 @@ private struct YTRoundedBar: Shape {
     }
 }
 
-// MARK: - Donut + Legend
+// MARK: - Donut + Legend (smaller)
 private struct ExpensesByCategoryCard: View {
     let data: [DashboardView.CategoryAmount]
 
-    // Avoid type ambiguity: explicitly typed palette
     private let palette: [Color] = [
         Color(red: 0.37, green: 0.62, blue: 0.86),
         Color(red: 0.46, green: 0.72, blue: 0.84),
@@ -219,61 +219,61 @@ private struct ExpensesByCategoryCard: View {
     ]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             Text("Expenses by Category").font(.headline)
                 .foregroundColor(.black).padding(.horizontal)
 
             let sorted = data.sorted { $0.amount > $1.amount }
             let total = max(sorted.reduce(0) { $0 + $1.amount }, 0.0001)
-            let columns: [GridItem] = [GridItem(.flexible()), GridItem(.flexible())] // explicit to avoid ambiguity
+            let columns: [GridItem] = [GridItem(.flexible()), GridItem(.flexible())]
 
-            VStack(spacing: 16) {
+            VStack(spacing: 12) {
                 Chart {
                     ForEach(Array(sorted.enumerated()), id: \.offset) { idx, item in
                         SectorMark(
                             angle: .value("Amount", item.amount),
-                            innerRadius: .ratio(0.62)
+                            innerRadius: .ratio(0.7) // smaller donut for tighter card
                         )
                         .foregroundStyle(palette[idx % palette.count])
                         .cornerRadius(2)
                     }
                 }
                 .chartLegend(.hidden)
-                .frame(height: 240)
+                .frame(height: 200) // was 240
                 .animation(.easeInOut(duration: 0.6), value: sorted)
 
-                LazyVGrid(columns: columns, spacing: 10) {
+                LazyVGrid(columns: columns, spacing: 8) {
                     ForEach(Array(sorted.enumerated()), id: \.offset) { idx, item in
-                        HStack(spacing: 10) {
+                        HStack(spacing: 8) {
                             Circle().fill(palette[idx % palette.count]).frame(width: 10, height: 10)
                             Text(item.category).font(.subheadline).lineLimit(1).foregroundColor(.primary)
                             Spacer()
                             let pct = Int((item.amount / total) * 100)
-                            Text("$\(item.amount, specifier: "%.2f") • \(pct)%")
+                            Text("$\(item.amount, specifier: "%.0f") • \(pct)%")
                                 .font(.caption).foregroundColor(.secondary)
                         }
-                        .padding(.horizontal, 8)
+                        .padding(.horizontal, 6)
                     }
                 }
                 .padding(.bottom, 6)
             }
             .padding(.horizontal)
         }
-        .padding(.vertical, 12)
+        .padding(.vertical, 10)
         .background(.white)
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 4)
-        .padding(.horizontal)
+        .padding(.horizontal, 14)
     }
 }
 
-// MARK: - Trend
+// MARK: - Trend (reduced height)
 private struct TrendCard: View {
     let incomeData: [DashboardView.DateAmount]
     let expenseData: [DashboardView.DateAmount]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             Text("Income vs Expense Trend").font(.headline)
                 .foregroundColor(.black).padding(.horizontal)
 
@@ -289,20 +289,20 @@ private struct TrendCard: View {
                         .foregroundStyle(.red).symbol(Circle())
                 }
             }
-            .frame(height: 240)
+            .frame(height: 200) // was 240
             .animation(.easeInOut(duration: 0.6), value: incomeData)
             .animation(.easeInOut(duration: 0.6), value: expenseData)
-            .padding(.horizontal)
+            .padding(.horizontal, 10)
         }
-        .padding(.vertical, 12)
+        .padding(.vertical, 10)
         .background(.white)
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 4)
-        .padding(.horizontal)
+        .padding(.horizontal, 14)
     }
 }
 
-// MARK: - DTI
+// MARK: - DTI (reduced height)
 private struct DTICard: View {
     let debt: Double
     let income: Double
@@ -311,31 +311,30 @@ private struct DTICard: View {
         let remaining = max(income - debt, 0)
         let ratio = income > 0 ? (debt / income) * 100 : 0
 
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             Text("Debt-to-Income Ratio").font(.headline)
                 .foregroundColor(.black).padding(.horizontal)
 
-            VStack {
+            VStack(spacing: 8) {
                 Chart {
-                    SectorMark(angle: .value("Debt", debt), innerRadius: .ratio(0.5)).foregroundStyle(.red)
-                    SectorMark(angle: .value("Remaining", remaining), innerRadius: .ratio(0.5)).foregroundStyle(.green)
+                    SectorMark(angle: .value("Debt", debt), innerRadius: .ratio(0.6)).foregroundStyle(.red)
+                    SectorMark(angle: .value("Remaining", remaining), innerRadius: .ratio(0.6)).foregroundStyle(.green)
                 }
-                .frame(height: 220)
+                .frame(height: 180) // was 220
                 .animation(.easeInOut(duration: 0.6), value: debt)
                 .animation(.easeInOut(duration: 0.6), value: income)
 
                 Text("DTI: \(ratio, specifier: "%.1f")%")
                     .font(.subheadline)
                     .foregroundColor(ratio > 35 ? .red : .green)
-                    .padding(.top, 4)
             }
-            .padding(.horizontal)
+            .padding(.horizontal, 10)
         }
-        .padding(.vertical, 12)
+        .padding(.vertical, 10)
         .background(.white)
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 4)
-        .padding(.horizontal)
+        .padding(.horizontal, 14)
     }
 }
 
@@ -344,24 +343,24 @@ private struct SummaryCard: View {
     let income: Double
     let expense: Double
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             Text("Summary").font(.headline)
                 .foregroundColor(.black).padding(.horizontal)
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text("Total Income: $\(income, specifier: "%.2f")")
                 Text("Total Expense: $\(expense, specifier: "%.2f")")
                 Text("Net: $\(income - expense, specifier: "%.2f")")
                     .foregroundColor((income - expense) >= 0 ? .green : .red)
             }
             .font(.body)
-            .padding(.horizontal)
-            .padding(.bottom, 8)
+            .padding(.horizontal, 10)
+            .padding(.bottom, 6)
         }
-        .padding(.vertical, 12)
+        .padding(.vertical, 10)
         .background(.white)
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 4)
-        .padding(.horizontal)
+        .padding(.horizontal, 14)
     }
 }
