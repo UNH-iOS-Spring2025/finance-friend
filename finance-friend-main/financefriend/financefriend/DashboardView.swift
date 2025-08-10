@@ -7,7 +7,7 @@ struct DashboardView: View {
     var body: some View {
         NavigationView {
             ScrollView {
-                VStack(spacing: 20) {
+                VStack(spacing: 24) {
                     HeaderAndBarCard(
                         incomeTotal: totalIncome(),
                         expenseTotal: totalExpense()
@@ -32,7 +32,7 @@ struct DashboardView: View {
                         expense: totalExpense()
                     )
                 }
-                .padding(.vertical, 12)
+                .padding(.vertical)
             }
             .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
             .onAppear {
@@ -54,7 +54,7 @@ struct DashboardView: View {
         let amount: Double
     }
 
-    // MARK: - Aggregations (unchanged)
+    // MARK: - Aggregations
     private func totalIncome() -> Double {
         manager.incomes.reduce(0) { $0 + $1.amount }
     }
@@ -84,19 +84,21 @@ struct DashboardView: View {
     }
 }
 
-// MARK: - Header + Blue Bar Card (resized for 16 Pro)
+// MARK: - Header + Blue Bar Card (iOS-16 slim, centered bars)
 private struct HeaderAndBarCard: View {
     let incomeTotal: Double
     let expenseTotal: Double
 
-    // Smaller than before: ~33% of screen height (was ~42%)
+    private let expenseColor = Color(red: 0.95, green: 0.35, blue: 0.30)
+
+    // shorter to fit iPhone 16 Pro nicely
     private var cardHeight: CGFloat {
         max(260, UIScreen.main.bounds.height * 0.33)
     }
 
     var body: some View {
         VStack(spacing: 18) {
-            // Top row: gear + title
+            // Top row
             HStack {
                 Image(systemName: "gearshape.fill")
                     .resizable().scaledToFill().frame(width: 20, height: 20)
@@ -124,8 +126,8 @@ private struct HeaderAndBarCard: View {
                 Spacer()
 
                 HStack(spacing: 12) {
-                    LegendDot(title: "Earned", color: Color.white.opacity(0.9))
-                    LegendDot(title: "Spent",  color: Color.white.opacity(0.6))
+                    LegendDot(title: "Earned", color: Color.white.opacity(0.95))
+                    LegendDot(title: "Spent",  color: expenseColor)
                 }
                 .padding(.vertical, 6)
                 .padding(.horizontal, 14)
@@ -134,23 +136,42 @@ private struct HeaderAndBarCard: View {
             }
             .padding(.horizontal)
 
-            // White rounded bars on blue background
-            Chart {
-                BarMark(x: .value("Type", "Income"),
-                        y: .value("Amount", incomeTotal))
-                .clipShape(YTRoundedBar(radius: 8))
-                .foregroundStyle(.white)
+            // Custom symmetric domain with spacers to keep bars centered and thinner
+            let domain = ["spL1","spL2","Income","spM1","spM2","Expense","spR1","spR2"]
+            let bars: [(label: String, value: Double, visible: Bool, color: Color)] = [
+                ("spL1", 0, false, .clear),
+                ("spL2", 0, false, .clear),
+                ("Income", incomeTotal, true, .white),
+                ("spM1", 0, false, .clear),
+                ("spM2", 0, false, .clear),
+                ("Expense", expenseTotal, true, expenseColor),
+                ("spR1", 0, false, .clear),
+                ("spR2", 0, false, .clear)
+            ]
 
-                BarMark(x: .value("Type", "Expense"),
-                        y: .value("Amount", expenseTotal))
-                .clipShape(YTRoundedBar(radius: 8))
-                .foregroundStyle(.white)
+            Chart {
+                ForEach(Array(bars.enumerated()), id: \.offset) { _, item in
+                    BarMark(
+                        x: .value("Type", item.label),
+                        y: .value("Amount", item.value)
+                    )
+                    .clipShape(YTRoundedBar(radius: 8))
+                    .foregroundStyle(item.color)
+                    .opacity(item.visible ? 1 : 0) // hide spacers
+                }
             }
+            .chartXScale(domain: domain) // ⬅️ enforce symmetric positions
             .chartXAxis {
-                AxisMarks(position: .bottom) { _ in
-                    AxisGridLine().foregroundStyle(.clear)
-                    AxisTick().foregroundStyle(.white)
-                    AxisValueLabel().foregroundStyle(.white)
+                AxisMarks(position: .bottom) { value in
+                    if let s = value.as(String.self), s == "Income" || s == "Expense" {
+                        AxisGridLine().foregroundStyle(.clear)
+                        AxisTick().foregroundStyle(.white)
+                        AxisValueLabel().foregroundStyle(.white)
+                    } else {
+                        AxisGridLine().foregroundStyle(.clear)
+                        AxisTick().foregroundStyle(.clear)
+                        AxisValueLabel("").foregroundStyle(.clear)
+                    }
                 }
             }
             .chartYAxis {
@@ -164,7 +185,7 @@ private struct HeaderAndBarCard: View {
                     }
                 }
             }
-            .frame(height: 150) // was 180
+            .frame(height: 150)
             .padding(.horizontal, 10)
             .animation(.easeOut(duration: 0.6), value: incomeTotal)
             .animation(.easeOut(duration: 0.6), value: expenseTotal)
@@ -191,7 +212,6 @@ private struct LegendDot: View {
     }
 }
 
-// Renamed to avoid duplicate-definition error
 private struct YTRoundedBar: Shape {
     var radius: CGFloat
     func path(in rect: CGRect) -> Path {
@@ -203,7 +223,7 @@ private struct YTRoundedBar: Shape {
     }
 }
 
-// MARK: - Donut + Legend (smaller)
+// MARK: - Donut + Legend (compact)
 private struct ExpensesByCategoryCard: View {
     let data: [DashboardView.CategoryAmount]
 
@@ -232,14 +252,14 @@ private struct ExpensesByCategoryCard: View {
                     ForEach(Array(sorted.enumerated()), id: \.offset) { idx, item in
                         SectorMark(
                             angle: .value("Amount", item.amount),
-                            innerRadius: .ratio(0.7) // smaller donut for tighter card
+                            innerRadius: .ratio(0.7)
                         )
                         .foregroundStyle(palette[idx % palette.count])
                         .cornerRadius(2)
                     }
                 }
                 .chartLegend(.hidden)
-                .frame(height: 200) // was 240
+                .frame(height: 200)
                 .animation(.easeInOut(duration: 0.6), value: sorted)
 
                 LazyVGrid(columns: columns, spacing: 8) {
@@ -267,10 +287,12 @@ private struct ExpensesByCategoryCard: View {
     }
 }
 
-// MARK: - Trend (reduced height)
+// MARK: - Trend (expense color updated)
 private struct TrendCard: View {
     let incomeData: [DashboardView.DateAmount]
     let expenseData: [DashboardView.DateAmount]
+
+    private let expenseColor = Color(red: 0.95, green: 0.35, blue: 0.30)
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -286,10 +308,11 @@ private struct TrendCard: View {
                 ForEach(expenseData) { item in
                     LineMark(x: .value("Date", item.date), y: .value("Expense", item.amount))
                         .interpolationMethod(.catmullRom)
-                        .foregroundStyle(.red).symbol(Circle())
+                        .foregroundStyle(expenseColor)
+                        .symbol(Circle())
                 }
             }
-            .frame(height: 200) // was 240
+            .frame(height: 200)
             .animation(.easeInOut(duration: 0.6), value: incomeData)
             .animation(.easeInOut(duration: 0.6), value: expenseData)
             .padding(.horizontal, 10)
@@ -302,7 +325,7 @@ private struct TrendCard: View {
     }
 }
 
-// MARK: - DTI (reduced height)
+// MARK: - DTI
 private struct DTICard: View {
     let debt: Double
     let income: Double
@@ -320,7 +343,7 @@ private struct DTICard: View {
                     SectorMark(angle: .value("Debt", debt), innerRadius: .ratio(0.6)).foregroundStyle(.red)
                     SectorMark(angle: .value("Remaining", remaining), innerRadius: .ratio(0.6)).foregroundStyle(.green)
                 }
-                .frame(height: 180) // was 220
+                .frame(height: 180)
                 .animation(.easeInOut(duration: 0.6), value: debt)
                 .animation(.easeInOut(duration: 0.6), value: income)
 
