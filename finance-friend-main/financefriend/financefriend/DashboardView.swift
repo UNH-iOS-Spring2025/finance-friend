@@ -1183,6 +1183,7 @@ import Charts
 struct DashboardView: View {
     @StateObject private var manager = FirestoreManager()
     @State private var timeRange: WealthRange = .oneMonth
+    @State private var showAddSnapshot = false
 
     var body: some View {
         NavigationView {
@@ -1194,7 +1195,6 @@ struct DashboardView: View {
                         expenseTotal: totalExpense()
                     )
 
-                    // Budget goals progress (optional – needs GoalItem + fetchGoals())
                     BudgetProgressCard(
                         goals: manager.goals,
                         expenses: manager.expenses
@@ -1232,11 +1232,23 @@ struct DashboardView: View {
             }
             .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
             .navigationTitle("Dashboard")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        showAddSnapshot = true
+                    } label: {
+                        Label("Add Wealth Snapshot", systemImage: "plus.circle")
+                    }
+                }
+            }
+            .sheet(isPresented: $showAddSnapshot) {
+                AddWealthSnapshotView(manager: manager)
+            }
             .onAppear {
                 manager.fetchAllExpenses()
                 manager.fetchAllIncomes()
                 manager.fetchGoals()
-                manager.fetchAccounts() // required for Wealth Over Time
+                manager.fetchWealthSnapshots()
             }
         }
     }
@@ -1290,7 +1302,7 @@ struct DashboardView: View {
             .sorted { $0.date < $1.date }
     }
 
-    // MARK: - Monthly Expenses Breakdown (current month)
+    // Current month breakdown
     private func monthlyExpensesByCategory() -> [CategoryAmount] {
         let cur = Date()
         let fm = DateFormatter()
@@ -1299,7 +1311,7 @@ struct DashboardView: View {
 
         var dict: [String: Double] = [:]
         for e in manager.expenses {
-            let monthKey = String(e.dateString.prefix(7)) // "yyyy-MM"
+            let monthKey = String(e.dateString.prefix(7))
             if monthKey == key {
                 dict[e.category, default: 0] += e.amount
             }
@@ -1308,7 +1320,7 @@ struct DashboardView: View {
             .sorted { $0.amount > $1.amount }
     }
 
-    // MARK: - Wealth Over Time
+    // MARK: - Wealth Over Time (from snapshots)
     enum WealthRange: String, CaseIterable, Identifiable {
         case oneMonth = "1M", sixMonths = "6M", oneYear = "1Y", fiveYears = "5Y"
         var id: String { rawValue }
@@ -1323,84 +1335,19 @@ struct DashboardView: View {
     }
 
     private func wealthSeries(range: WealthRange) -> [SeriesPoint] {
-        let df = DateFormatter()
-        df.dateFormat = "yyyy-MM-dd"
-
-        struct AccHist { let points: [(Date, Double)] }
-
-        let accountsHistories: [AccHist] = manager.accounts.map { acc in
-            var pts: [(Date, Double)] = []
-            if !acc.history.isEmpty {
-                for h in acc.history {
-                    if let d = df.date(from: h.date) {
-                        pts.append((d, h.amount))
-                    }
-                }
-            } else {
-                // No history? Seed with createdAt + current balance (flat line)
-                if let d = df.date(from: acc.createdAt) {
-                    pts.append((d, acc.balance))
-                }
-            }
-            pts.sort { $0.0 < $1.0 }
-            return AccHist(points: pts)
-        }
-
-        guard !accountsHistories.isEmpty else { return [] }
+        let all = manager.wealthSnapshots.sorted { $0.date < $1.date }
+        guard !all.isEmpty else { return [] }
 
         let end = Date()
-        let months = range.months
-        let start = Calendar.current.date(byAdding: .month, value: -months, to: end) ?? end
+        let start = Calendar.current.date(byAdding: .month, value: -range.months, to: end) ?? end
+        let filtered = all.filter { $0.date >= start && $0.date <= end }
+        let use = filtered.isEmpty ? all.suffix(1) : filtered
 
-        // daily for <= 12 months, weekly for 5Y
-        let stepDays = (months <= 12) ? 1 : 7
-        let timeline = datesInRange(from: start, to: end, stepDays: stepDays)
-
-        var series: [SeriesPoint] = []
-        for t in timeline {
-            var total: Double = 0
-            for acc in accountsHistories {
-                if let latest = latestAmount(onOrBefore: t, in: acc.points) {
-                    total += latest
-                }
-            }
-            series.append(SeriesPoint(date: t, total: total))
-        }
-
-        if series.allSatisfy({ $0.total == 0 }) {
-            let nowTotal = manager.accounts.reduce(0) { $0 + $1.balance }
-            return timeline.map { SeriesPoint(date: $0, total: nowTotal) }
-        }
-        return series
-    }
-
-    private func datesInRange(from start: Date, to end: Date, stepDays: Int) -> [Date] {
-        var dates: [Date] = []
-        var d = Calendar.current.startOfDay(for: start)
-        let endDay = Calendar.current.startOfDay(for: end)
-        while d <= endDay {
-            dates.append(d)
-            if let next = Calendar.current.date(byAdding: .day, value: stepDays, to: d) {
-                d = next
-            } else {
-                break
-            }
-        }
-        if let last = dates.last, Calendar.current.isDate(last, inSameDayAs: endDay) == false {
-            dates.append(endDay)
-        }
-        return dates
-    }
-
-    private func latestAmount(onOrBefore date: Date, in points: [(Date, Double)]) -> Double? {
-        for i in stride(from: points.count - 1, through: 0, by: -1) {
-            if points[i].0 <= date { return points[i].1 }
-        }
-        return nil
+        return use.map { SeriesPoint(date: $0.date, total: $0.total) }
     }
 }
 
-// MARK: - Header + Blue Bar Card (slim, centered bars; iOS16-safe)
+// MARK: - Header + Blue Bar Card (slim, centered bars)
 private struct HeaderAndBarCard: View {
     let incomeTotal: Double
     let expenseTotal: Double
@@ -1445,7 +1392,7 @@ private struct HeaderAndBarCard: View {
             }
             .padding(.horizontal)
 
-            // center the slim bars using spacer buckets in the x-domain
+            // center slim bars with spacer buckets
             let domain = ["spL1","spL2","Income","spM1","spM2","Expense","spR1","spR2"]
             let bars: [(label: String, value: Double, visible: Bool, color: Color)] = [
                 ("spL1", 0, false, .clear),
@@ -1642,8 +1589,10 @@ private struct MonthlyExpensesBarCard: View {
             } else {
                 Chart {
                     ForEach(monthly) { item in
-                        BarMark(x: .value("Category", item.category),
-                                y: .value("Amount", item.amount))
+                        BarMark(
+                            x: .value("Category", item.category),
+                            y: .value("Amount", item.amount)
+                        )
                         .foregroundStyle(expenseColor)
                     }
                 }

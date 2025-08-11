@@ -1,57 +1,83 @@
-//
-//  AddAssetView.swift
-//  financefriend
-//
-//  Created by Chanikya Ch on 8/10/25.
-//
-
-import Foundation
 import SwiftUI
 
 struct AddAssetView: View {
     @ObservedObject var manager: FirestoreManager
-    @Environment(\.presentationMode) var presentationMode
+    @Environment(\.dismiss) private var dismiss
 
     @State private var name: String = ""
-    @State private var type: String = "stock"
-    @State private var balance: String = ""
-    @State private var date = Date()
+    @State private var type: String = "bank"
+    @State private var balanceText: String = ""
+    @State private var selectedDate: Date = Date()
 
     @State private var showError = false
+    @State private var showConfirm = false
 
-    private let types = ["stock","bond","crypto","cash","other"]
+    private let types = ["bank", "credit", "cash", "stock", "bond", "crypto", "real estate", "other"]
 
     var body: some View {
         NavigationView {
             Form {
-                Section(header: Text("Asset")) {
-                    TextField("Name (e.g., Apple, Savings)", text: $name)
+                Section(header: Text("Account")) {
+                    TextField("Name (e.g. Checking, Robinhood)", text: $name)
+
                     Picker("Type", selection: $type) {
-                        ForEach(types, id: \.self) { Text($0.capitalized).tag($0) }
+                        ForEach(types, id: \.self) { t in
+                            Text(t.capitalized).tag(t)
+                        }
                     }
-                    .pickerStyle(.menu)
                 }
 
                 Section(header: Text("Balance")) {
-                    TextField("Amount", text: $balance)
+                    TextField("e.g. 1200.50", text: $balanceText)
                         .keyboardType(.decimalPad)
-                    DatePicker("As of", selection: $date, displayedComponents: .date)
+                }
+
+                Section(header: Text("As of Date")) {
+                    DatePicker("Date", selection: $selectedDate, displayedComponents: .date)
                 }
 
                 Section {
-                    Button("Save Asset") {
-                        guard let amt = Double(balance), !name.trimmingCharacters(in: .whitespaces).isEmpty else {
-                            showError = true; return
+                    Button {
+                        guard !name.trimmingCharacters(in: .whitespaces).isEmpty,
+                              Double(balanceText) != nil else {
+                            showError = true
+                            return
                         }
-                        manager.addAccount(name: name, type: type, balance: amt, date: date)
-                        presentationMode.wrappedValue.dismiss()
+                        showConfirm = true
+                    } label: {
+                        Text("Save Asset")
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .foregroundColor(.white)
+                            .background(Color.blue)
+                            .cornerRadius(10)
                     }
-                    .buttonStyle(.borderedProminent)
                 }
             }
             .navigationTitle("Add Asset")
-            .alert("Please fill valid values", isPresented: $showError) {
-                Button("OK", role: .cancel) {}
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+            }
+            .alert("Invalid Input", isPresented: $showError) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text("Please enter a name and a valid balance.")
+            }
+            .alert("Confirm Asset", isPresented: $showConfirm) {
+                Button("Cancel", role: .cancel) { }
+                Button("Add") {
+                    if let balance = Double(balanceText) {
+                        // NOTE: matches FirestoreManager signature:
+                        // func addAccount(name:type:balance:date:)
+                        manager.addAccount(name: name, type: type, balance: balance, date: selectedDate)
+                        dismiss()
+                    }
+                }
+            } message: {
+                Text("Add \(name) (\(type.capitalized)) with balance $\(balanceText)?")
             }
         }
     }
