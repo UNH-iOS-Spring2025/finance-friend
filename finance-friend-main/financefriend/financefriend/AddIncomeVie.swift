@@ -14,7 +14,6 @@ struct AddIncomeView: View {
     @State private var showSuccess = false
     @State private var showError = false
 
-    // Edit these to taste
     private let incomeCategories = [
         "Salary", "Freelance", "Business", "Investment",
         "Gift", "Allowance", "Bonus", "Other"
